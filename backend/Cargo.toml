@@ -1,0 +1,44 @@
+[package]
+name = "agentcluster-backend"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = { version = "0.7", features = ["macros"] }
+tokio = { version = "1", features = ["full", "rt-multi-thread"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+
+# Configuration
+config = { version = "0.15", features = ["yaml"] }
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio", "uuid", "chrono", "postgres"] }
+scylla = "0.13"
+qdrant-client = "1.10"
+
+# Etcd for state storage
+etcd-client = "0.8"
+
+# Utility
+uuid = { version = "1.0", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+time = { version = "0.3", features = ["serde"] }
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "json", "env-filter"] }
+
+# gRPC for inter-service communication
+tonic = "0.9"
+prost = "0.13"
+
+# Security
+jsonwebtoken = "8.3"
+bcrypt = "0.13"
+
+[dev-dependencies]
+# Test dependencies

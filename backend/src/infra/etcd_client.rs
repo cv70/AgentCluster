@@ -1,0 +1,142 @@
+use etcd_client::{Client, ConnectOptions};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::time::Duration;
+use tracing::{error, info};
+
+use crate::domain::agent_node::AgentNode;
+use crate::domain::agent_task::AgentTask;
+
+#[derive(Debug, Clone)]
+pub struct EtcdConfig {
+    pub endpoints: Vec<String>,
+    pub username: String,
+    pub password: String,
+    pub prefix: String,
+    pub timeout_secs: u64,
+}
+
+impl Default for EtcdConfig {
+    fn default() -> Self {
+        Self {
+            endpoints: vec!["http://localhost:2379".to_string()],
+            username: "".to_string(),
+            password: "".to_string(),
+            prefix: "/agentcluster".to_string(),
+            timeout_secs: 5,
+        }
+    }
+}
+
+pub struct EtcdClient {
+    client: Client,
+    config: EtcdConfig,
+}
+
+impl EtcdClient {
+    pub async fn new(config: EtcdConfig) -> Result<Self, Box<dyn std::error::Error>> {
+        let connect_options = ConnectOptions::default()
+            .username(config.username.clone())
+            .password(config.password.clone())
+            .timeout(Duration::from_secs(config.timeout_secs));
+
+        let client = Client::connect(config.endpoints.clone(), connect_options).await?;
+        
+        info!("Connected to etcd at {:?}", config.endpoints);
+        
+        Ok(Self {
+            client,
+            config,
+        })
+    }
+
+    pub async fn save_node(&self, node: &AgentNode) -> Result<(), Box<dyn std::error::Error>> {
+        let key = format!("/agents/nodes/{}", node.id);
+        let value = serde_json::to_string(node)?;
+        self.client.put(&key, value, None).await?;
+        Ok(())
+    }
+
+    pub async fn get_node(&self, node_id: &str) -> Result<Option<AgentNode>, Box<dyn std::error::Error>> {
+        let key = format!("/agents/nodes/{}", node_id);
+        let resp = self.client.get(&key, None).await?;
+        
+        if resp.kvs().is_empty() {
+            return Ok(None);
+        }
+        
+        let value = String::from_utf8(resp.kvs()[0].value().to_vec())?;
+        let node: AgentNode = serde_json::from_str(&value)?;
+        Ok(Some(node))
+    }
+
+    pub async fn list_nodes(&self) -> Result<Vec<AgentNode>, Box<dyn std::error::Error>> {
+        let resp = self.client.get_prefix("/agents/nodes/", None).await?;
+        let mut nodes = Vec::new();
+        
+        for kv in resp.kvs() {
+            let value = String::from_utf8(kv.value().to_vec())?;
+            let node: AgentNode = serde_json::from_str(&value)?;
+            nodes.push(node);
+        }
+        
+        Ok(nodes)
+    }
+
+    pub async fn delete_node(&self, node_id: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let key = format!("/agents/nodes/{}", node_id);
+        self.client.delete(&key, None).await?;
+        Ok(())
+    }
+
+    // Task operations
+    pub async fn save_task(&self, task: &AgentTask) -> Result<(), Box<dyn std::error::Error>> {
+        let key = format!("/agents/tasks/{}", task.id);
+        let value = serde_json::to_string(task)?;
+        self.client.put(&key, value, None).await?;
+        Ok(())
+    }
+
+    pub async fn get_task(&self, task_id: &str) -> Result<Option<AgentTask>, Box<dyn std::error::Error>> {
+        let key = format!("/agents/tasks/{}", task_id);
+        let resp = self.client.get(&key, None).await?;
+        
+        if resp.kvs().is_empty() {
+            return Ok(None);
+        }
+        
+        let value = String::from_utf8(resp.kvs()[0].value().to_vec())?;
+        let task: AgentTask = serde_json::from_str(&value)?;
+        Ok(Some(task))
+    }
+
+    pub async fn list_tasks(&self) -> Result<Vec<AgentTask>, Box<dyn std::error::Error>> {
+        let resp = self.client.get_prefix("/agents/tasks/", None).await?;
+        let mut tasks = Vec::new();
+        
+        for kv in resp.kvs() {
+            let value = String::from_utf8(kv.value().to_vec())?;
+            let task: AgentTask = serde_json::from_str(&value)?;
+            tasks.push(task);
+        }
+        
+        Ok(tasks)
+    }
+
+    pub async fn delete_task(&self, task_id: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let key = format!("/agents/tasks/{}", task_id);
+        self.client.delete(&key, None).await?;
+        Ok(())
+    }
+
+    // Health check
+    pub async fn health_check(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
+        match self.client.status().await {
+            Ok(_) => Ok(true),
+            Err(e) => {
+                error!("Etcd health check failed: {}", e);
+                Ok(false)
+            }
+        }
+    }
+}

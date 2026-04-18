@@ -1,0 +1,29 @@
+server:
+  host: 0.0.0.0
+  port: 8888
+
+database:
+  postgres_url: "postgres://postgres:postgres@localhost:5432/agentcluster"
+  scylla_url: "scylla://scylla:scylla@localhost:9042/agentcluster"
+
+etcd:
+  endpoints: ["http://localhost:2379"]
+  username: ""
+  password: ""
+
+security:
+  jwt_secret: "your-secret-key-change-in-production"
+  jwt_expires_in: 60  # minutes
+
+# ScyllaDB configuration (if used directly)
+scylla:
+  hosts: ["localhost:9042"]
+  username: "scylla"
+  password: "scylla"
+  keyspace: "agentcluster"
+
+# Vector database configuration (if used directly)
+vector:
+  host: "localhost"
+  port: 6333
+  api_key: ""
